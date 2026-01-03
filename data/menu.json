@@ -1,0 +1,11 @@
+{
+  "eventName": "Demo Event",
+  "currency": "ILS",
+  "items": [
+    { "id": "mojito", "name": "Mojito", "category": "Cocktail", "price": 42, "desc": "Rum, mint, lime, soda." },
+    { "id": "gin-tonic", "name": "Gin & Tonic", "category": "Cocktail", "price": 38, "desc": "Gin, tonic, citrus." },
+    { "id": "whisky-cola", "name": "Whisky Cola", "category": "Highball", "price": 40, "desc": "Whisky, cola, ice." },
+    { "id": "beer", "name": "Beer", "category": "Beer", "price": 28, "desc": "Cold and simple." },
+    { "id": "water", "name": "Water", "category": "Soft", "price": 10, "desc": "Stay hydrated." }
+  ]
+}
