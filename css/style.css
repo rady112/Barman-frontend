@@ -97,11 +97,12 @@ body{
 
 /* Toast popup
    center fade-in 2s -> stay at bottom 2s -> fade-out 2s */
+/* Toast base */
 .toast{
   position: fixed;
   left: 50%;
-  bottom: 24px;              /* always near bottom */
-  transform: translateX(-50%);
+  bottom: 24px;
+  transform: translateX(-50%) translateY(18px); /* starts slightly lower */
   opacity: 0;
   pointer-events: none;
   z-index: 9999;
@@ -114,19 +115,35 @@ body{
   color: #fff;
   font-size: 16px;
   text-align: center;
+
+  /* smoother drag */
+  will-change: transform, opacity;
+  touch-action: pan-y;
 }
+
+/* When visible */
 .toast.show{
-  animation: toastSequence 6s ease-in-out forwards;
+  pointer-events: auto; /* allow swipe */
+  animation: toastIn 2s ease forwards, toastHold 2s linear 2s forwards, toastOut 2s ease 4s forwards;
 }
-@keyframes toastSequence{
-  /* 0-2s: fade in at center */
-  0%   { opacity: 0; transform: translate(-50%, -50%); }
-  33%  { opacity: 1; transform: translate(-50%, -50%); }
 
-  /* 2-4s: move to bottom and stay */
-  34%  { opacity: 1; transform: translate(-50%, calc(50vh - 90px)); }
-  66%  { opacity: 1; transform: translate(-50%, calc(50vh - 90px)); }
+/* If user dismisses it manually */
+.toast.dismiss{
+  pointer-events: none;
+  animation: toastOut 0.25s ease forwards;
+}
 
-  /* 4-6s: fade out at bottom */
-  100% { opacity: 0; transform: translate(-50%, calc(50vh - 90px)); }
+@keyframes toastIn{
+  from { opacity: 0; transform: translateX(-50%) translateY(18px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0px); }
+}
+
+@keyframes toastHold{
+  from { opacity: 1; transform: translateX(-50%) translateY(0px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0px); }
+}
+
+@keyframes toastOut{
+  from { opacity: 1; transform: translateX(-50%) translateY(0px); }
+  to   { opacity: 0; transform: translateX(-50%) translateY(24px); }
 }
