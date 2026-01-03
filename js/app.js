@@ -16,126 +16,156 @@ const MENUS = [
 const cart = [];
 
 // ---------------- Toast + swipe-to-dismiss ----------------
-let toastTimer = null;
-let toastInitialized = false;
+// ---------------- Toast + swipe-to-dismiss (no animation restarts) ----------------
+let toastStartHideTimer = null; // triggers hide after 4s
+let toastCleanupTimer = null;   // cleanup after 6s
+let toastHideAt = 0;            // timestamp when hide should start
+let toastEndAt = 0;             // timestamp when toast fully ends
 
-function initToastSwipe() {
-  if (toastInitialized) return;
-  toastInitialized = true;
+function clearToastTimers() {
+  clearTimeout(toastStartHideTimer);
+  clearTimeout(toastCleanupTimer);
+  toastStartHideTimer = null;
+  toastCleanupTimer = null;
+}
 
-  const toast = document.getElementById("toast");
-  if (!toast) return;
+function scheduleToastTimers(remainingStartHideMs = 4000, remainingCleanupMs = 6000) {
+  const now = Date.now();
+  toastHideAt = now + remainingStartHideMs;
+  toastEndAt  = now + remainingCleanupMs;
 
-  let startY = 0;
-  let currentY = 0;
-  let dragging = false;
-
-  const threshold = 55; // px swipe-down to dismiss
-
-  function setDragTransform(deltaY) {
-    const clamped = Math.max(0, deltaY); // only allow downward drag
-    toast.style.transform = `translateX(-50%) translateY(${clamped}px)`;
-    // optional: fade slightly while dragging down
-    const alpha = Math.max(0, 1 - clamped / 180);
-    toast.style.opacity = String(alpha);
-  }
-
-  function resetTransform() {
-    toast.style.transform = "";
-    toast.style.opacity = "";
-  }
-
-  function dismissToastNow() {
-    clearTimeout(toastTimer);
-    toast.classList.remove("show");
-    toast.classList.add("dismiss");
-    // clean up after dismiss animation
-    setTimeout(() => {
-      toast.classList.remove("dismiss");
-      resetTransform();
-    }, 300);
-  }
-
-  function onStart(clientY) {
-    // Only allow swipe while toast is visible
-    if (!toast.classList.contains("show")) return;
-    dragging = true;
-    startY = clientY;
-    currentY = clientY;
-
-    // Stop CSS animations so drag feels direct
-    toast.style.animation = "none";
-  }
-
-  function onMove(clientY) {
-    if (!dragging) return;
-    currentY = clientY;
-    const delta = currentY - startY;
-    setDragTransform(delta);
-  }
-
-  function onEnd() {
-    if (!dragging) return;
-    dragging = false;
-
-    const delta = currentY - startY;
-
-    // restore animation so it can continue or exit
-    toast.style.animation = "";
-
-    if (delta > threshold) {
-      dismissToastNow();
-    } else {
-      // snap back to normal visible state
-      resetTransform();
-
-      // re-apply show animations cleanly (continue with remaining time is hard; restart is simplest)
-      toast.classList.remove("show");
-      void toast.offsetWidth;
-      toast.classList.add("show");
-
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => {
-        toast.classList.remove("show");
-      }, 6100);
-    }
-  }
-
-  // Touch
-  toast.addEventListener("touchstart", (e) => onStart(e.touches[0].clientY), { passive: true });
-  toast.addEventListener("touchmove", (e) => onMove(e.touches[0].clientY), { passive: true });
-  toast.addEventListener("touchend", onEnd);
-
-  // Mouse (desktop drag)
-  toast.addEventListener("mousedown", (e) => onStart(e.clientY));
-  window.addEventListener("mousemove", (e) => onMove(e.clientY));
-  window.addEventListener("mouseup", onEnd);
+  toastStartHideTimer = setTimeout(() => startHideToast(), remainingStartHideMs);
+  toastCleanupTimer   = setTimeout(() => cleanupToast(), remainingCleanupMs);
 }
 
 function showAddedToCartToast(itemName) {
   const toast = document.getElementById("toast");
   if (!toast) return;
 
-  initToastSwipe();
+  initToastSwipeOnce();
 
-  // reset any inline styles from dragging
+  // Reset state
+  clearToastTimers();
+  toast.classList.remove("hiding", "dragging", "fast");
   toast.style.transform = "";
   toast.style.opacity = "";
-  toast.style.animation = "";
-
-  toast.classList.remove("dismiss");
-  toast.classList.remove("show");
-  void toast.offsetWidth;
 
   toast.textContent = `${itemName} added to the cart`;
-  toast.classList.add("show");
 
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    toast.classList.remove("show");
-  }, 6100);
+  // Show (2s fade+move up via CSS transition)
+  // Force reflow to ensure transition plays when re-showing quickly
+  toast.classList.remove("visible");
+  void toast.offsetWidth;
+  toast.classList.add("visible");
+
+  // 2s in + 2s hold => start hide at t=4s; hide completes at t=6s
+  scheduleToastTimers(4000, 6000);
 }
 
+function startHideToast(fast = false) {
+  const toast = document.getElementById("toast");
+  if (!toast) return;
+
+  toast.classList.remove("dragging");
+  toast.classList.toggle("fast", fast);
+
+  // Trigger 2s fade+move down (or 0.25s if fast)
+  toast.classList.add("hiding");
+  toast.classList.remove("visible");
+
+  // If fast, cleanup quickly
+  if (fast) {
+    clearToastTimers();
+    toastCleanupTimer = setTimeout(() => cleanupToast(), 300);
+  }
+}
+
+function cleanupToast() {
+  const toast = document.getElementById("toast");
+  if (!toast) return;
+
+  toast.classList.remove("visible", "hiding", "dragging", "fast");
+  toast.style.transform = "";
+  toast.style.opacity = "";
+  clearToastTimers();
+}
+
+let toastSwipeInitialized = false;
+
+function initToastSwipeOnce() {
+  if (toastSwipeInitialized) return;
+  toastSwipeInitialized = true;
+
+  const toast = document.getElementById("toast");
+  if (!toast) return;
+
+  let startY = 0;
+  let deltaY = 0;
+  let dragging = false;
+
+  let remainingStartHide = 0;
+  let remainingCleanup = 0;
+
+  const threshold = 55; // px down to dismiss
+
+  toast.addEventListener("pointerdown", (e) => {
+    if (!toast.classList.contains("visible")) return;
+
+    dragging = true;
+    startY = e.clientY;
+    deltaY = 0;
+
+    // Pause timers (so touching doesn't restart anything)
+    const now = Date.now();
+    remainingStartHide = Math.max(0, toastHideAt - now);
+    remainingCleanup   = Math.max(0, toastEndAt - now);
+    clearToastTimers();
+
+    toast.classList.add("dragging");
+    toast.classList.remove("fast");
+    toast.setPointerCapture(e.pointerId);
+  });
+
+  toast.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+
+    deltaY = Math.max(0, e.clientY - startY); // only drag down
+    toast.style.transform = `translateX(-50%) translateY(${deltaY}px)`;
+
+    // fade slightly while dragging
+    const alpha = Math.max(0, 1 - deltaY / 180);
+    toast.style.opacity = String(alpha);
+  });
+
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+
+    // If swiped far enough -> dismiss fast
+    if (deltaY > threshold) {
+      toast.style.transform = "";
+      toast.style.opacity = "";
+      toast.classList.remove("dragging");
+      startHideToast(true);
+      return;
+    }
+
+    // Not dismissed -> snap back without restarting animation
+    toast.classList.remove("dragging");
+    toast.style.transform = "";
+    toast.style.opacity = "";
+
+    // Resume timers from where they paused
+    // Ensure it remains visible
+    toast.classList.add("visible");
+    toast.classList.remove("hiding", "fast");
+
+    scheduleToastTimers(remainingStartHide, remainingCleanup);
+  }
+
+  toast.addEventListener("pointerup", endDrag);
+  toast.addEventListener("pointercancel", endDrag);
+}
 // ---------------- Cart ----------------
 function addToCart(item) {
   cart.push(item);
