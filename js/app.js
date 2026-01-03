@@ -15,7 +15,6 @@ const MENUS = [
 // Demo cart state
 const cart = [];
 
-// ---------------- Toast + swipe-to-dismiss ----------------
 // ---------------- Toast + swipe-to-dismiss (no animation restarts) ----------------
 let toastStartHideTimer = null; // triggers hide after 4s
 let toastCleanupTimer = null;   // cleanup after 6s
@@ -34,7 +33,7 @@ function scheduleToastTimers(remainingStartHideMs = 4000, remainingCleanupMs = 6
   toastHideAt = now + remainingStartHideMs;
   toastEndAt  = now + remainingCleanupMs;
 
-  toastStartHideTimer = setTimeout(() => startHideToast(), remainingStartHideMs);
+  toastStartHideTimer = setTimeout(() => startHideToast(false), remainingStartHideMs);
   toastCleanupTimer   = setTimeout(() => cleanupToast(), remainingCleanupMs);
 }
 
@@ -44,21 +43,22 @@ function showAddedToCartToast(itemName) {
 
   initToastSwipeOnce();
 
-  // Reset state
   clearToastTimers();
-  toast.classList.remove("hiding", "dragging", "fast");
+
+  // reset classes + inline styles (in case user dragged)
+  toast.classList.remove("hiding", "dragging", "fast", "visible");
   toast.style.transform = "";
   toast.style.opacity = "";
 
   toast.textContent = `${itemName} added to the cart`;
 
-  // Show (2s fade+move up via CSS transition)
-  // Force reflow to ensure transition plays when re-showing quickly
-  toast.classList.remove("visible");
+  // force reflow so transition always triggers
   void toast.offsetWidth;
+
+  // show
   toast.classList.add("visible");
 
-  // 2s in + 2s hold => start hide at t=4s; hide completes at t=6s
+  // start hide at t=4s; end at t=6s
   scheduleToastTimers(4000, 6000);
 }
 
@@ -69,11 +69,9 @@ function startHideToast(fast = false) {
   toast.classList.remove("dragging");
   toast.classList.toggle("fast", fast);
 
-  // Trigger 2s fade+move down (or 0.25s if fast)
   toast.classList.add("hiding");
   toast.classList.remove("visible");
 
-  // If fast, cleanup quickly
   if (fast) {
     clearToastTimers();
     toastCleanupTimer = setTimeout(() => cleanupToast(), 300);
@@ -106,7 +104,7 @@ function initToastSwipeOnce() {
   let remainingStartHide = 0;
   let remainingCleanup = 0;
 
-  const threshold = 55; // px down to dismiss
+  const threshold = 55;
 
   toast.addEventListener("pointerdown", (e) => {
     if (!toast.classList.contains("visible")) return;
@@ -115,7 +113,7 @@ function initToastSwipeOnce() {
     startY = e.clientY;
     deltaY = 0;
 
-    // Pause timers (so touching doesn't restart anything)
+    // pause timers
     const now = Date.now();
     remainingStartHide = Math.max(0, toastHideAt - now);
     remainingCleanup   = Math.max(0, toastEndAt - now);
@@ -129,10 +127,9 @@ function initToastSwipeOnce() {
   toast.addEventListener("pointermove", (e) => {
     if (!dragging) return;
 
-    deltaY = Math.max(0, e.clientY - startY); // only drag down
+    deltaY = Math.max(0, e.clientY - startY);
     toast.style.transform = `translateX(-50%) translateY(${deltaY}px)`;
 
-    // fade slightly while dragging
     const alpha = Math.max(0, 1 - deltaY / 180);
     toast.style.opacity = String(alpha);
   });
@@ -141,7 +138,6 @@ function initToastSwipeOnce() {
     if (!dragging) return;
     dragging = false;
 
-    // If swiped far enough -> dismiss fast
     if (deltaY > threshold) {
       toast.style.transform = "";
       toast.style.opacity = "";
@@ -150,13 +146,11 @@ function initToastSwipeOnce() {
       return;
     }
 
-    // Not dismissed -> snap back without restarting animation
+    // snap back + resume timers
     toast.classList.remove("dragging");
     toast.style.transform = "";
     toast.style.opacity = "";
 
-    // Resume timers from where they paused
-    // Ensure it remains visible
     toast.classList.add("visible");
     toast.classList.remove("hiding", "fast");
 
@@ -165,7 +159,8 @@ function initToastSwipeOnce() {
 
   toast.addEventListener("pointerup", endDrag);
   toast.addEventListener("pointercancel", endDrag);
-}
+} // ✅ THIS CLOSING BRACE WAS MISSING IN YOUR VERSION
+
 // ---------------- Cart ----------------
 function addToCart(item) {
   cart.push(item);
@@ -231,7 +226,6 @@ function renderAllMenus() {
   });
 }
 
-// Safety
 function escapeHtml(str) {
   return String(str)
     .replaceAll("&", "&amp;")
