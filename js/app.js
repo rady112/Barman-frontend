@@ -4,7 +4,6 @@ import shots from "../data/shots.js";
 import beer from "../data/beer.js";
 import soft from "../data/soft.js";
 
-// Order exactly as requested
 const MENUS = [
   { key: "popular", label: "Popular cocktails", items: popular },
   { key: "specials", label: "Rady's specials", items: specials },
@@ -16,13 +15,115 @@ const MENUS = [
 // Demo cart state
 const cart = [];
 
-// ----- Toast -----
+// ---------------- Toast + swipe-to-dismiss ----------------
 let toastTimer = null;
+let toastInitialized = false;
+
+function initToastSwipe() {
+  if (toastInitialized) return;
+  toastInitialized = true;
+
+  const toast = document.getElementById("toast");
+  if (!toast) return;
+
+  let startY = 0;
+  let currentY = 0;
+  let dragging = false;
+
+  const threshold = 55; // px swipe-down to dismiss
+
+  function setDragTransform(deltaY) {
+    const clamped = Math.max(0, deltaY); // only allow downward drag
+    toast.style.transform = `translateX(-50%) translateY(${clamped}px)`;
+    // optional: fade slightly while dragging down
+    const alpha = Math.max(0, 1 - clamped / 180);
+    toast.style.opacity = String(alpha);
+  }
+
+  function resetTransform() {
+    toast.style.transform = "";
+    toast.style.opacity = "";
+  }
+
+  function dismissToastNow() {
+    clearTimeout(toastTimer);
+    toast.classList.remove("show");
+    toast.classList.add("dismiss");
+    // clean up after dismiss animation
+    setTimeout(() => {
+      toast.classList.remove("dismiss");
+      resetTransform();
+    }, 300);
+  }
+
+  function onStart(clientY) {
+    // Only allow swipe while toast is visible
+    if (!toast.classList.contains("show")) return;
+    dragging = true;
+    startY = clientY;
+    currentY = clientY;
+
+    // Stop CSS animations so drag feels direct
+    toast.style.animation = "none";
+  }
+
+  function onMove(clientY) {
+    if (!dragging) return;
+    currentY = clientY;
+    const delta = currentY - startY;
+    setDragTransform(delta);
+  }
+
+  function onEnd() {
+    if (!dragging) return;
+    dragging = false;
+
+    const delta = currentY - startY;
+
+    // restore animation so it can continue or exit
+    toast.style.animation = "";
+
+    if (delta > threshold) {
+      dismissToastNow();
+    } else {
+      // snap back to normal visible state
+      resetTransform();
+
+      // re-apply show animations cleanly (continue with remaining time is hard; restart is simplest)
+      toast.classList.remove("show");
+      void toast.offsetWidth;
+      toast.classList.add("show");
+
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove("show");
+      }, 6100);
+    }
+  }
+
+  // Touch
+  toast.addEventListener("touchstart", (e) => onStart(e.touches[0].clientY), { passive: true });
+  toast.addEventListener("touchmove", (e) => onMove(e.touches[0].clientY), { passive: true });
+  toast.addEventListener("touchend", onEnd);
+
+  // Mouse (desktop drag)
+  toast.addEventListener("mousedown", (e) => onStart(e.clientY));
+  window.addEventListener("mousemove", (e) => onMove(e.clientY));
+  window.addEventListener("mouseup", onEnd);
+}
 
 function showAddedToCartToast(itemName) {
   const toast = document.getElementById("toast");
   if (!toast) return;
 
+  initToastSwipe();
+
+  // reset any inline styles from dragging
+  toast.style.transform = "";
+  toast.style.opacity = "";
+  toast.style.animation = "";
+
+  toast.classList.remove("dismiss");
   toast.classList.remove("show");
   void toast.offsetWidth;
 
@@ -30,17 +131,19 @@ function showAddedToCartToast(itemName) {
   toast.classList.add("show");
 
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove("show"), 6100);
+  toastTimer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 6100);
 }
 
-// ----- Cart -----
+// ---------------- Cart ----------------
 function addToCart(item) {
   cart.push(item);
   const cartCount = document.getElementById("cartCount");
   if (cartCount) cartCount.textContent = String(cart.length);
 }
 
-// ----- Rendering: all menus one below the other -----
+// ---------------- Rendering: menus stacked vertically ----------------
 function renderAllMenus() {
   const root = document.getElementById("menuSections");
   if (!root) return;
@@ -72,9 +175,14 @@ function renderAllMenus() {
           ? item.ingredients.join(", ")
           : "Ingredients: (coming soon)";
 
+      const descriptionHtml = item.description
+        ? `<div class="card-desc">${escapeHtml(item.description)}</div>`
+        : "";
+
       card.innerHTML = `
         <div class="card-title">${escapeHtml(item.name)}</div>
         <div class="card-sub">${escapeHtml(ingredientsText)}</div>
+        ${descriptionHtml}
         <button class="add-btn" type="button">Add</button>
       `;
 
@@ -93,7 +201,7 @@ function renderAllMenus() {
   });
 }
 
-// Safety: avoid accidental HTML injection
+// Safety
 function escapeHtml(str) {
   return String(str)
     .replaceAll("&", "&amp;")
@@ -103,5 +211,4 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
-// Init
 renderAllMenus();
