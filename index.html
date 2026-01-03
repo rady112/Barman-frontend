@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>BaRady</title>
 
-  <!-- IMPORTANT: your CSS is in /css/style.css -->
   <link rel="stylesheet" href="css/style.css" />
 </head>
 
@@ -24,17 +23,12 @@
   </header>
 
   <main class="container">
-    <!-- Sub-menu tabs -->
-    <nav class="menu-tabs" id="menuTabs"></nav>
-
-    <!-- Cards grid -->
-    <section id="menuGrid" class="menu-grid"></section>
+    <!-- All menus render here, one below the other -->
+    <div id="menuSections"></div>
   </main>
 
-  <!-- Toast popup -->
   <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
 
-  <!-- IMPORTANT: your JS is in /js/app.js and must be a module -->
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
