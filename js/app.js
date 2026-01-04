@@ -204,6 +204,10 @@ function renderAllMenus() {
     const grid = document.createElement("div");
     grid.className = "menu-grid";
 
+    // If any item in this menu has an image, reserve media space for ALL cards in this menu
+    // so card heights stay aligned even with mixed image availability.
+    const menuHasImages = menu.items.some((it) => Boolean(it.image));
+
     menu.items.forEach((item) => {
       const card = document.createElement("div");
       card.className = "card";
@@ -217,11 +221,22 @@ function renderAllMenus() {
         ? `<div class="card-desc">${escapeHtml(item.description)}</div>`
         : "";
 
+      const mediaHtml = !menuHasImages
+        ? ""
+        : item.image
+          ? `<img class="card-img" src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}">`
+          : `<div class="card-img-placeholder" aria-hidden="true"></div>`;
+
       card.innerHTML = `
-        <div class="card-title">${escapeHtml(item.name)}</div>
-        <div class="card-sub">${escapeHtml(ingredientsText)}</div>
-        ${descriptionHtml}
-        <button class="add-btn" type="button">Add</button>
+        ${mediaHtml}
+        <div class="card-content">
+          <div class="card-title">${escapeHtml(item.name)}</div>
+          <div class="card-sub">${escapeHtml(ingredientsText)}</div>
+          ${descriptionHtml}
+        </div>
+        <div class="card-actions">
+          <button class="add-btn" type="button">Add</button>
+        </div>
       `;
 
       card.querySelector(".add-btn").onclick = () => {
